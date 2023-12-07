@@ -10,6 +10,9 @@
   "type": "module",
   "license": "ISC",
   "dependencies": {
-    "rc": "^1.2.8"
+    "dayjs": "^1.11.10",
+    "excel4node": "^1.8.2",
+    "rc": "^1.2.8",
+    "yargs": "^17.7.2"
   }
 }
