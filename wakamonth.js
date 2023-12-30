@@ -8,20 +8,21 @@ import {hideBin} from 'yargs/helpers'
 import dayjs from 'dayjs'
 
 const config = rc('wakamonth', {
-    //defaults go here.
     api_key: '',
+    employee: '',
     endpoint: '',
+    precision: 60,
+    project: '',
 })
 
-
 async function fetchSummary(month) {
-    const month_first_day = dayjs().set('month', month - 1).startOf('month').format('YYYY-MM-DD')
-    const month_last_day = dayjs().set('month', month - 1).endOf('month').format('YYYY-MM-DD')
+    const monthFirstDay = dayjs().set('month', month - 1).startOf('month').format('YYYY-MM-DD')
+    const monthLastDay = dayjs().set('month', month - 1).endOf('month').format('YYYY-MM-DD')
 
     const qs = querystring.encode({
-        from: month_first_day,
-        project: 'discover',
-        to: month_last_day
+        from: monthFirstDay,
+        project: config.project,
+        to: monthLastDay
     })
 
     const request = new Request(`${config.endpoint}/api/summary?${qs}`, {
@@ -56,11 +57,12 @@ yargs(hideBin(process.argv))
     .command('report>', 'Make a month hour report', () => {}, async (argv) => {
         const date = new Date()
         date.setMonth(argv.month - 1)
-        const month_formatted = date.toLocaleString('default', {month: 'long'})
-        const year_formatted = date.getYear() - 100
+        const monthFormatted = date.toLocaleString('default', {month: 'long'})
+        const yearFormatted = date.getYear() - 100
         const result = await fetchSummary(argv.month)
-        let branches = result.branches.map((branch) => {
-            branch.total = Math.ceil(branch.total / 60 / 60)
+        const branches = result.branches.map((branch) => {
+            // Base granularity is in minutes
+            branch.total = branch.total / 60
             return branch
         })
         if (!branches.length) {
@@ -68,53 +70,57 @@ yargs(hideBin(process.argv))
             return 
         }
 
-        let unknown_branch_index
-        const unknown_branch = branches.find((branch, index) => {
+        let unknownBranchIndex
+        let unknownMinutesSpread = 0
+        const unknownBranch = branches.find((branch, index) => {
             if (branch.key === 'unknown') {
-                unknown_branch_index = index
+                unknownBranchIndex = index
                 return true
             }
             return false
         })
-        if (unknown_branch) {
-            branches.splice(unknown_branch_index, 1)
-            const unknown_hours = unknown_branch.total
-            const unknown_hour_spread = Math.ceil(unknown_hours / branches.length)
-            console.log(`Spreading unallocated time: ${unknown_hours}`)
-            branches = branches.map((branch) => {
-                branch.total += unknown_hour_spread
-                return branch
-            })
+        
+        if (unknownBranch) {
+            branches.splice(unknownBranchIndex, 1)
+            const unknownMinutes = unknownBranch.total
+            console.log(`unallocated time: ${unknownMinutes}`)
+            unknownMinutesSpread = unknownMinutes / branches.length
         }
+
+        branches.forEach((branch) => {
+            branch.total += unknownMinutesSpread
+            branch.total = (Math.ceil(branch.total / config.precision) * config.precision) / 60
+        })
 
         const wb = new xl.Workbook()
-        const ws = wb.addWorksheet(`Hours ${month_formatted} ${year_formatted}`)
+        const ws = wb.addWorksheet(`Hours ${monthFormatted} ${yearFormatted}`)
         
-        const style_title = wb.createStyle({font: {bold: true, color: '#000000', size: 12}})
-        const style_default = wb.createStyle({font: {color: '#000000', size: 12}})
-        const style_hours = wb.createStyle({font: {color: '#000000', size: 12}, numberFormat: 'h#,##0.00; (h#,##0.00); -'})
+        const styleTitle = wb.createStyle({font: {bold: true, color: '#000000', size: 12}})
+        const styleDefault = wb.createStyle({font: {color: '#000000', size: 12}})
+        const styleHours = wb.createStyle({font: {color: '#000000', size: 12}, numberFormat: 'h#,##0.00; (h#,##0.00); -'})
         
-        ws.cell(1, 1).string('Branch').style(style_title)
-        ws.cell(1, 2).string('Hours').style(style_title)
-        ws.cell(1, 3).string('Declarable').style(style_title)
+        ws.cell(1, 1).string('Branch').style(styleTitle)
+        ws.cell(1, 2).string('Hours').style(styleTitle)
+        ws.cell(1, 3).string('Declarable').style(styleTitle)
         ws.column(1).setWidth(60)
 
-        let item_row = 2
+        let itemRow = 2
         for (const branch of branches) {
-            const branch_name = branch.key
-            const branch_hours = branch.total
+            const branchName = branch.key
+            const branchHours = branch.total
 
-            ws.cell(item_row, 1).string(branch_name).style(style_default)
-            ws.cell(item_row, 2).number(branch_hours).style(style_hours)
-            ws.cell(item_row, 3).string('x').style(style_default)
+            ws.cell(itemRow, 1).string(branchName).style(styleDefault)
+            ws.cell(itemRow, 2).number(branchHours).style(styleHours)
+            ws.cell(itemRow, 3).string('x').style(styleDefault)
 
-            item_row +=1 
+            itemRow +=1 
+            console.log(`${branchName}: ${branchHours}h`)
         }
 
-        ws.cell(item_row, 1).string('Total:').style(style_title)
-        ws.cell(item_row, 2).formula(`SUMIF(C2:C${item_row -1},"x",B2:B${item_row -1})`)
+        ws.cell(itemRow, 1).string('Total:').style(styleTitle)
+        ws.cell(itemRow, 2).formula(`SUMIF(C2:C${itemRow -1},"x",B2:B${itemRow -1})`)
         
-        wb.write(`hours report ${argv.month}-${year_formatted} ${config.employee}.xlsx`)
+        wb.write(`${argv.month}-${yearFormatted}-${config.employee.split(' ').join('-')}.xlsx`)
     })
     .demandCommand(1)
     .parse()
