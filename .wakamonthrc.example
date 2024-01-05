@@ -1,7 +1,8 @@
 {
     "api_key": "",
+    "employee": "Jane Doe",
     "endpoint": "https://wakapi.mydomain.org",
-    "employee": "John Doe",
     "precision: 60,
-    "project": "myproject"
+    "project": "myproject",
+    "spread_unallocated": true
 }
