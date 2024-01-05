@@ -1,7 +1,8 @@
 {
     "api_key": "",
+    "domain": "https://wakapi.mydomain.org",
     "employee": "Jane Doe",
-    "endpoint": "https://wakapi.mydomain.org",
+    "endpoint": "/api/compat/wakatime/v1/users/current/summaries",
     "precision: 60,
     "project": "myproject",
     "spread_unallocated": true

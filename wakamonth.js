@@ -2,7 +2,7 @@
 import archy from 'archy'
 import chalk from 'chalk'
 import rc from 'rc'
-import { Buffer } from 'node:buffer'
+import {Buffer} from 'node:buffer'
 import querystring from 'node:querystring'
 import yargs from 'yargs'
 import xl from 'excel4node'
@@ -12,7 +12,8 @@ import dayjs from 'dayjs'
 const config = rc('wakamonth', {
     api_key: '',
     employee: 'Jane Doe',
-    endpoint: 'https://wakapi.mydomain.org',
+    domain: 'https://wakapi.mydomain.org',
+    endpoint: '/api/compat/wakatime/v1/users/current/summaries',
     precision: 60,
     project: 'myproject',
     spread_unallocated: true
@@ -28,7 +29,7 @@ async function fetchSummary(year, month) {
         project: config.project,
     })
 
-    const request = new Request(`${config.endpoint}/api/compat/wakatime/v1/users/current/summaries?${qs}`, {
+    const request = new Request(`${config.domain}${config.endpoint}?${qs}`, {
         method: 'GET',      
         headers: {
             'Accept': 'application/json, text/*',
