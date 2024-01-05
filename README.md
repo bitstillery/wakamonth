@@ -38,7 +38,7 @@ spread_unallocated: Unknown hours will be spread between other branches if activ
 Typical usage:
 
 ```bash
-npx wakamonth -y 2024 -m 1 report -o stdout
+npx @bitstillery/wakamonth -y 2024 -m 1 report
 ```
 
 For development:
