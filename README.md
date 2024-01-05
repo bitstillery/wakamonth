@@ -4,7 +4,14 @@ Generate reports of coding time in hours per Git branch, based on Wakatime/Wakap
 Please notice that time tracked by Wakapi is an **estimate** and definitely not legally binding,
 so please keep that in mind when using it for billing reports / invoices.
 
-## Configuration
+## Getting started
+
+```bash
+wget -O ~/.wakamonthrc https://raw.githubusercontent.com/bitstillery/wakamonth/main/.wakamonthrc.example
+npx @bitstillery/wakamonth -y 2024 -m 1 report
+```
+
+## Config
 
 ```bash
 wget https://raw.githubusercontent.com/bitstillery/wakamonth/main/.wakamonthrc.example -o ~/.wakamonthrc
@@ -23,43 +30,14 @@ vim ~/.wakamonthrc
 }
 ```
 
-Config explanation:
+* api_key: Your Wakatime/Wakapi API key
+* domain: The domain to call the endpoint on for [Wakatime](https://wakatime.com) or [Wakapi](https://wakapi.mydomain.org)
+* endpoint: [Wakapi](/api/compat/wakatime/v1/users/current/summaries) or [Wakatime](/api/v1/users/current/summaries) endpoint
+* precision: 60 (hours) | 30 (half-hourly) | 15 (quarter-hourly)
+* project: The Wakatime/Wakapi project to report on
+* spread_unallocated: Unknown hours will be spread across other branches if active
 
-```md
-api_key:
-Your Wakatime/Wakapi API key
-
-domain:
-The domain to call the endpoint on
-"https://wakatime.com" for Wakatime
-"https://wakapi.mydomain.org" for Wakapi
-
-endpoint:
-"/api/compat/wakatime/v1/users/current/summaries" for Wakapi
-"/api/v1/users/current/summaries" for Wakatime
-
-precision:
-Ceils branch time to minutes
-- 60 for hours
-- 30 for half-hourly
-- 15 for quarter-hourly
-
-project:
-The Wakatime/Wakapi project to report on
-
-spread_unallocated:
-Unknown hours will be spread across other branches if active
-```
-
-## Usage
-
-Typical usage:
-
-```bash
-npx @bitstillery/wakamonth -y 2024 -m 1 report
-```
-
-For development:
+## Development
 
 ```bash
 git clone https://github.com/bitstillery/wakamonth.git
