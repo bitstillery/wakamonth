@@ -15,9 +15,9 @@ const config = rc('wakamonth', {
     project: '',
 })
 
-async function fetchSummary(month) {
-    const monthFirstDay = dayjs().set('month', month - 1).startOf('month').format('YYYY-MM-DD')
-    const monthLastDay = dayjs().set('month', month - 1).endOf('month').format('YYYY-MM-DD')
+async function fetchSummary(year, month) {
+    const monthFirstDay = dayjs().year(year).set('month', month - 1).startOf('month').format('YYYY-MM-DD')
+    const monthLastDay = dayjs().year(year).set('month', month - 1).endOf('month').format('YYYY-MM-DD')
 
     const qs = querystring.encode({
         from: monthFirstDay,
@@ -54,12 +54,21 @@ yargs(hideBin(process.argv))
         describe: 'Report month number number',
         type: 'number',
     })
-    .command('report>', 'Make a month hour report', () => {}, async (argv) => {
+    .option('year', {
+        alias: 'y',
+        default: dayjs().format('YYYY'),
+        describe: 'The year to report',
+        type: 'number',
+    })
+    .command('report', 'Make an hour report (month)', () => {}, async (argv) => {
         const date = new Date()
         date.setMonth(argv.month - 1)
+        date.setFullYear(argv.year)
         const monthFormatted = date.toLocaleString('default', {month: 'long'})
+
         const yearFormatted = date.getYear() - 100
-        const result = await fetchSummary(argv.month)
+        const result = await fetchSummary(argv.year, argv.month)
+
         const branches = result.branches.map((branch) => {
             // Base granularity is in minutes
             branch.total = branch.total / 60
@@ -83,7 +92,7 @@ yargs(hideBin(process.argv))
         if (unknownBranch) {
             branches.splice(unknownBranchIndex, 1)
             const unknownMinutes = unknownBranch.total
-            console.log(`unallocated time: ${unknownMinutes}`)
+            console.log(`unallocated time: ${(Math.ceil(unknownMinutes / config.precision) * config.precision) / 60}h`)
             unknownMinutesSpread = unknownMinutes / branches.length
         }
 
@@ -93,7 +102,7 @@ yargs(hideBin(process.argv))
         })
 
         const wb = new xl.Workbook()
-        const ws = wb.addWorksheet(`Hours ${monthFormatted} ${yearFormatted}`)
+        const ws = wb.addWorksheet(`Hours ${monthFormatted}-${yearFormatted}`)
         
         const styleTitle = wb.createStyle({font: {bold: true, color: '#000000', size: 12}})
         const styleDefault = wb.createStyle({font: {color: '#000000', size: 12}})
@@ -101,7 +110,7 @@ yargs(hideBin(process.argv))
         
         ws.cell(1, 1).string('Branch').style(styleTitle)
         ws.cell(1, 2).string('Hours').style(styleTitle)
-        ws.cell(1, 3).string('Declarable').style(styleTitle)
+        ws.cell(1, 3).string('Include').style(styleTitle)
         ws.column(1).setWidth(60)
 
         let itemRow = 2
@@ -120,7 +129,7 @@ yargs(hideBin(process.argv))
         ws.cell(itemRow, 1).string('Total:').style(styleTitle)
         ws.cell(itemRow, 2).formula(`SUMIF(C2:C${itemRow -1},"x",B2:B${itemRow -1})`)
         
-        wb.write(`${argv.month}-${yearFormatted}-${config.employee.split(' ').join('-')}.xlsx`)
+        wb.write(`${monthFormatted}-${yearFormatted}-${config.employee.split(' ').join('-')}.xlsx`)
     })
     .demandCommand(1)
     .parse()
