@@ -7,7 +7,7 @@ so please keep that in mind when using it for billing reports / invoices.
 ## Configuration
 
 ```bash
-wget https://raw.githubusercontent.com/bitstillery/wakamonth/main/.wakamonthrc.example -o .wakamonthrc
+wget https://raw.githubusercontent.com/bitstillery/wakamonth/main/.wakamonthrc.example -o ~/.wakamonthrc
 vim ~/.wakamonthrc
 ```
 
