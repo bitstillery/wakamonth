@@ -88,9 +88,9 @@ async function outputExcel(branches, date) {
     ws.cell(itemRow, 1).string('Total:').style(styleTitle)
     ws.cell(itemRow, 2).formula(`SUMIF(C2:C${itemRow -1},"x",B2:B${itemRow -1})`)
     
-    const filename = `${date.getMonth()}-${date.getYear() - 100}-${config.employee.split(' ').join('-')}.xlsx`
+    const filename = `${date.getMonth() + 1}-${date.getYear() - 100}-${config.employee.split(' ').join('-')}.xlsx`
     console.log(`${chalk.blue('wrote excel hours sheet:')} ${filename}`)
-    wb.write(`${date.getMonth()}-${date.getYear() - 100}-${config.employee.split(' ').join('-')}.xlsx`)
+    wb.write(filename)
 }
 
 yargs(hideBin(process.argv))
