@@ -3,33 +3,47 @@ import archy from 'archy'
 import chalk from 'chalk'
 import rc from 'rc'
 import {Buffer} from 'node:buffer'
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
 import querystring from 'node:querystring'
 import yargs from 'yargs'
 import xl from 'excel4node'
+import ini from 'ini'
 import {hideBin} from 'yargs/helpers'
 import dayjs from 'dayjs'
 
 const config = rc('wakamonth', {
-    api_key: '',
-    employee: 'Jane Doe',
-    domain: 'https://wakapi.mydomain.org',
-    endpoint: '/api/compat/wakatime/v1/users/current/summaries',
+    backend: 'wakapi',
     precision: 60,
-    project: 'myproject',
     spread_unallocated: true
 })
 
-async function fetchSummary(year, month) {
+const wakatime_path = path.join(os.homedir(), '.wakatime.cfg')
+
+if (!fs.existsSync(wakatime_path)) {
+    console.error('a ~/.wakatime.cfg file is required')
+    process.exit(1)
+}
+
+const wakatime_config = ini.parse(fs.readFileSync(wakatime_path, 'utf8'))
+
+
+config.api_url = wakatime_config.settings.api_url
+config.api_key = wakatime_config.settings.api_key
+
+async function fetchSummary(project, user, year, month) {
     const monthFirstDay = dayjs().year(year).set('month', month - 1).startOf('month').format('YYYY-MM-DD')
     const monthLastDay = dayjs().year(year).set('month', month - 1).endOf('month').format('YYYY-MM-DD')
 
     const qs = querystring.encode({
         end: monthLastDay,
         start: monthFirstDay,
-        project: config.project,
+        project,
     })
 
-    const request = new Request(`${config.domain}${config.endpoint}?${qs}`, {
+    const endpoint = config.backend === 'wakapi' ? `/compat/wakatime/v1/users/${user.id}/summaries` : `/v1/users/${user.id}/summaries`
+    const request = new Request(`${config.api_url}${endpoint}?${qs}`, {
         method: 'GET',      
         headers: {
             'Accept': 'application/json, text/*',
@@ -46,6 +60,24 @@ async function fetchSummary(year, month) {
     return result
 }
 
+async function fetchUser(user) {
+    const endpoint = config.backend === 'wakapi' ? `/compat/wakatime/v1/users/${user}` : `/v1/users/${user}`
+    const request = new Request(`${config.api_url}${endpoint}`, {
+        method: 'GET',      
+        headers: {
+            'Accept': 'application/json, text/*',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Content-Type': 'application/json; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Authorization': `Basic ${Buffer.from(config.api_key).toString('base64')}`,
+        }
+    })
+    const res = await fetch(request)
+    const result = await res.json()
+    return result.data
+}
+
+
 
 function outputStdout(branches) {   
     const tree = {
@@ -59,7 +91,7 @@ function outputStdout(branches) {
 }
 
 
-async function outputExcel(branches, date) {
+async function outputExcel(user, branches, date) {
     const yearFormatted = date.getYear() - 100
     const monthFormatted = date.toLocaleString('default', {month: 'long'})
 
@@ -88,7 +120,7 @@ async function outputExcel(branches, date) {
     ws.cell(itemRow, 1).string('Total:').style(styleTitle)
     ws.cell(itemRow, 2).formula(`SUMIF(C2:C${itemRow -1},"x",B2:B${itemRow -1})`)
     
-    const filename = `${date.getMonth() + 1}-${date.getYear() - 100}-${config.employee.split(' ').join('-')}.xlsx`
+    const filename = `${date.getMonth() + 1}-${date.getYear() - 100}-${user.username}.xlsx`
     console.log(`${chalk.blue('wrote excel hours sheet:')} ${filename}`)
     wb.write(filename)
 }
@@ -98,37 +130,54 @@ yargs(hideBin(process.argv))
     .detectLocale(false)
     .option('month', {
         alias: 'm',
-        default: 1,
+        default: new Date().getMonth() + 1,
         describe: 'Report month number number',
         type: 'number',
     })
-    .option('output', {
-        alias: 'o',
-        default: 'stdout',
-        describe: 'Write hour report to',
+    .option('user', {
+        alias: 'u',
+        default: 'current',
+        describe: 'User to report on',
+        type: 'string',
+    })
+    .option('export', {
+        alias: 'e',
+        default: '',
+        describe: 'Export to',
+        type: 'string',
+    })
+    .option('project', {
+        alias: 'p',
+        default: '',
+        describe: 'Project to filter on',
         type: 'string',
     })
     .option('year', {
         alias: 'y',
         default: dayjs().format('YYYY'),
-        describe: 'The year to report',
+        describe: 'Year to report on',
         type: 'number',
     })
     .command('report', 'Make an hour report (month)', () => {}, async (argv) => {
-        if (!['stdout', 'xlsx'].includes(argv.output)) {
-            throw new Error(`Invalid output: ${argv.output}`)
+        if (argv.export && !['xlsx'].includes(argv.export)) {
+            throw new Error(`Invalid output: ${argv.export}`)
         }
         const branches = {}
         const date = new Date()
         date.setMonth(argv.month - 1)
         date.setFullYear(argv.year)
-           
-        const result = await fetchSummary(argv.year, argv.month)
+        const user = await fetchUser(argv.user)
+        const result = await fetchSummary(argv.project, user, argv.year, argv.month)
         const options = {
             label: 'wakamonth 🕠',
             nodes: [
-                {label: `${chalk.cyan('output'.padEnd(50))} ${argv.output.padStart(6)}`},
+                {label: `${chalk.cyan('export'.padEnd(50))} ${argv.export ? argv.export.padStart(6): '-'.padStart(6)}`},
             ]
+        }
+
+        if (!result) {
+            console.log(`No results found for ${argv.project}/${user.id}-${argv.year}/${argv.month}`)
+            process.exit(1)
         }
 
         for (const resultSet of result.data) {
@@ -142,7 +191,7 @@ yargs(hideBin(process.argv))
         }
 
         if (!Object.keys(branches).length) {
-            console.log(`no branches found for ${argv.month}/${argv.year}`)
+            console.log(`no branches found for project ${argv.project}:${argv.month}/${argv.year}`)
             return 
         }
 
@@ -167,10 +216,11 @@ yargs(hideBin(process.argv))
             branch.total = (Math.ceil(branch.total / config.precision) * config.precision) / 60
         }
 
-        if (argv.output === 'stdout') {
+        outputStdout(branches, date)
+
+        if (argv.export === 'xlsx') {
             outputStdout(branches, date)
-        } else if (argv.output === 'xlsx') {
-            outputExcel(branches, date)
+            outputExcel(user, branches, date)
         } 
     })
     .demandCommand(1)
