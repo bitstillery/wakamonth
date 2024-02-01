@@ -1,5 +1,4 @@
 {
-    "backend": "wakapi",
     "spread_unallocated": true,
     "precision: 60
 }

@@ -13,12 +13,6 @@ import ini from 'ini'
 import {hideBin} from 'yargs/helpers'
 import dayjs from 'dayjs'
 
-const config = rc('wakamonth', {
-    backend: 'wakapi',
-    precision: 60,
-    spread_unallocated: true
-})
-
 const wakatime_path = path.join(os.homedir(), '.wakatime.cfg')
 
 if (!fs.existsSync(wakatime_path)) {
@@ -27,10 +21,12 @@ if (!fs.existsSync(wakatime_path)) {
 }
 
 const wakatime_config = ini.parse(fs.readFileSync(wakatime_path, 'utf8'))
-
-
-config.api_url = wakatime_config.settings.api_url
-config.api_key = wakatime_config.settings.api_key
+const config = rc('wakamonth', {
+    api_url: wakatime_config.settings.api_url,
+    api_key: wakatime_config.settings.api_key,
+    precision: 60,
+    spread_unallocated: true
+})
 
 async function fetchSummary(project, user, year, month) {
     const monthFirstDay = dayjs().year(year).set('month', month - 1).startOf('month').format('YYYY-MM-DD')
@@ -42,7 +38,7 @@ async function fetchSummary(project, user, year, month) {
         project,
     })
 
-    const endpoint = config.backend === 'wakapi' ? `/compat/wakatime/v1/users/${user.id}/summaries` : `/v1/users/${user.id}/summaries`
+    const endpoint = `/v1/users/${user.id}/summaries`
     const request = new Request(`${config.api_url}${endpoint}?${qs}`, {
         method: 'GET',      
         headers: {
@@ -61,7 +57,7 @@ async function fetchSummary(project, user, year, month) {
 }
 
 async function fetchUser(user) {
-    const endpoint = config.backend === 'wakapi' ? `/compat/wakatime/v1/users/${user}` : `/v1/users/${user}`
+    const endpoint = `/v1/users/${user}`
     const request = new Request(`${config.api_url}${endpoint}`, {
         method: 'GET',      
         headers: {
