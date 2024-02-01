@@ -73,11 +73,11 @@ async function fetchUser(user) {
     return result.data
 }
 
-async function outputExcel(user, branches, date) {
+async function outputExcel(user, project, branches, date) {
     const ymd = date.toISOString().split('T')[0].split('-')
 
     const wb = new xl.Workbook()
-    const ws = wb.addWorksheet(`Hours ${ymd[0]}-${ymd[1]}`)
+    const ws = wb.addWorksheet(`Hours ${project}: ${ymd[0]}-${ymd[1]}`)
     
     const styleTitle = wb.createStyle({font: {bold: true, color: '#000000', size: 12}})
     const styleDefault = wb.createStyle({font: {color: '#000000', size: 12}})
@@ -91,10 +91,24 @@ async function outputExcel(user, branches, date) {
     let itemRow = 2
     for (const [branchName, branch] of Object.entries(branches)) {
         const branchHours = branch.total
+        let branchUrl = null
+        if (config.autolink.enabled) {
+            const issueNumber = branchName.match(config.autolink.issue_regex)
+            if (issueNumber) {
+                branchUrl = config.autolink.url.replace('{{project}}', project).replace('{{issue}}', issueNumber[0])
+            }
+        }
 
-        ws.cell(itemRow, 1).string(branchName).style(styleDefault)
+        if (branchUrl) {
+            ws.cell(itemRow, 1).link(branchUrl, branchName).style(styleDefault)
+        } else {
+            ws.cell(itemRow, 1).string(branchName).style(styleDefault)
+        }
         ws.cell(itemRow, 2).number(branchHours).style(styleHours)
-        ws.cell(itemRow, 3).string('x').style(styleDefault)
+        if (!branchName.match(config.include.ignore_regex)) {
+            ws.cell(itemRow, 3).string('x').style(styleDefault)
+        }
+
         itemRow +=1         
     }
 
@@ -143,20 +157,21 @@ yargs(hideBin(process.argv))
         if (argv.export && !['xlsx'].includes(argv.export)) {
             throw new Error(`Invalid output: ${argv.export}`)
         }
+        const project = argv.project
         const branches = {}
         let allocatedHours = 0
         const date = new Date()
         date.setMonth(argv.month - 1)
         date.setFullYear(argv.year)
         const user = await fetchUser(argv.user)
-        const result = await fetchSummary(argv.project, user, argv.year, argv.month)
+        const result = await fetchSummary(project, user, argv.year, argv.month)
         const options = {
             label: 'wakamonth 🕠',
             nodes: []
         }
 
         if (!result) {
-            console.log(`No results found for ${argv.project}/${user.id}-${argv.year}/${argv.month}`)
+            console.log(`No results found for ${project}/${user.id}-${argv.year}/${argv.month}`)
             process.exit(1)
         }
 
@@ -173,7 +188,7 @@ yargs(hideBin(process.argv))
         }
 
         if (!Object.keys(branches).length) {
-            console.log(`no branches found for project ${argv.project}:${argv.month}/${argv.year}`)
+            console.log(`no branches found for project ${project}:${argv.month}/${argv.year}`)
             return
         }
 
@@ -213,7 +228,7 @@ yargs(hideBin(process.argv))
         archy(options).split('\r').forEach((line) => console.log(line))
 
         if (argv.export === 'xlsx') {
-            outputExcel(user, branches, date)
+            outputExcel(user, project, branches, date)
         } 
     })
     .demandCommand(1)

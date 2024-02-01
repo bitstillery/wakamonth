@@ -1,4 +1,12 @@
 {
-    "spread_unallocated": true,
-    "precision: 60
+    "autolink": {
+        "enabled": "false",
+        "issue_regex": "^\\d+",
+        "url": "https://codeberg.org/organisation/{{project}}/issues/{{issue}}"
+    },
+    "include": {
+        "ignore_regex": "^-fix-|main|staging"
+    },
+    "precision": 60,
+    "spread_unallocated": true
 }
