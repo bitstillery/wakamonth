@@ -163,6 +163,7 @@ yargs(hideBin(process.argv))
             throw new Error(`Invalid output: ${argv.export}`)
         }
         const branches = {}
+        let allocatedHours = 0
         const date = new Date()
         date.setMonth(argv.month - 1)
         date.setFullYear(argv.year)
@@ -170,9 +171,7 @@ yargs(hideBin(process.argv))
         const result = await fetchSummary(argv.project, user, argv.year, argv.month)
         const options = {
             label: 'wakamonth 🕠',
-            nodes: [
-                {label: `${chalk.cyan('export'.padEnd(50))} ${argv.export ? argv.export.padStart(6): '-'.padStart(6)}`},
-            ]
+            nodes: []
         }
 
         if (!result) {
@@ -180,46 +179,59 @@ yargs(hideBin(process.argv))
             process.exit(1)
         }
 
-        for (const resultSet of result.data) {
+        for (const resultSet of result.data) {   
+            // No rounding; just keep the Wakapi numbers here in minutes.
             for (const branch of resultSet.branches) {
+                const total = branch.total_seconds / 60
                 if (!(branch.name in branches)) {
-                    branches[branch.name] = {total: branch.total_seconds / 60}
+                    branches[branch.name] = {total}
                 } else {
-                    branches[branch.name].total += branch.total_seconds / 60
-                }
-            }
+                    branches[branch.name].total += total
+                }                
+            }            
         }
 
         if (!Object.keys(branches).length) {
             console.log(`no branches found for project ${argv.project}:${argv.month}/${argv.year}`)
-            return 
+            return
         }
 
         let spreadUnknown = 0
+
+
+        allocatedHours
+        const optionUnallocated = {label: chalk.yellow('unallocated'), nodes: []}  
         if (branches.unknown) {
-            const unknownHours = (Math.ceil(branches.unknown.total / config.precision) * config.precision) / 60
-            const optionUnallocated = {label: chalk.cyan('unallocated'), nodes: []}
-            options.nodes.push(optionUnallocated)            
+            const unAllocatedHours = (Math.ceil(branches.unknown.total / config.precision) * config.precision) / 60                              
             spreadUnknown = Math.ceil(branches.unknown.total / Object.keys(branches).length)
-            optionUnallocated.nodes.push({label: `${chalk.cyan('total'.padEnd(48))} ${String(unknownHours).padStart(5)}h`})
-            optionUnallocated.nodes.push({label: `${chalk.cyan('branch'.padEnd(48))} ${String((spreadUnknown / 60).toFixed(2)).padStart(5)}h`})
-            optionUnallocated.nodes.push({label: `${chalk.cyan('spread'.padEnd(48))} ${(config.spread_unallocated ? 'yes' : 'no').padStart(6)}`})
+            optionUnallocated.nodes.push({label: `${chalk.white('total'.padEnd(48))} ${String(unAllocatedHours).padStart(5)}h`})
+            optionUnallocated.nodes.push({label: `${chalk.white('spread'.padEnd(48))} ${(config.spread_unallocated ? 'yes' : 'no').padStart(6)}`})
+            optionUnallocated.nodes.push({label: `${chalk.white('time / branch'.padEnd(48))} ${String((spreadUnknown / 60).toFixed(2)).padStart(5)}h`})
             delete branches.unknown
         }
-
-        archy(options).split('\r').forEach((line) => console.log(line))
-
+       
         for (const branch of Object.values(branches)) {
+            // Rounding; assign unallocated hours (if applicable).
             if (config.spread_unallocated) { 
                 branch.total += spreadUnknown
             }
             branch.total = (Math.ceil(branch.total / config.precision) * config.precision) / 60
+            allocatedHours += branch.total
         }
 
-        outputStdout(branches, date)
+        const optionAllocated = {label: chalk.green('allocated'), nodes: []}
+        optionAllocated.nodes.push({label: `${chalk.white('total'.padEnd(48))} ${String(allocatedHours).padStart(5)}h`})
+        options.nodes.push({
+            label: 'branches',
+            nodes: Object.entries(branches).map(([label, branch]) => {
+                return {label: `${chalk.blue(label.padEnd(50))} ${String(branch.total).padStart(5)}h`}
+            })
+        })
+        options.nodes.push(optionUnallocated) 
+        options.nodes.push(optionAllocated)
+        archy(options).split('\r').forEach((line) => console.log(line))
 
         if (argv.export === 'xlsx') {
-            outputStdout(branches, date)
             outputExcel(user, branches, date)
         } 
     })
