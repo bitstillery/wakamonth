@@ -77,26 +77,11 @@ async function fetchUser(user) {
     return result.data
 }
 
-
-
-function outputStdout(branches) {   
-    const tree = {
-        label: 'branches',
-        nodes: Object.entries(branches).map(([label, branch]) => {
-            return {label: `${chalk.blue(label.padEnd(50))} ${String(branch.total).padStart(5)}h`}
-        })
-    }
-
-    archy(tree).split('\r').forEach((line) => console.log(line))
-}
-
-
 async function outputExcel(user, branches, date) {
-    const yearFormatted = date.getYear() - 100
-    const monthFormatted = date.toLocaleString('default', {month: 'long'})
+    const ymd = date.toISOString().split('T')[0].split('-')
 
     const wb = new xl.Workbook()
-    const ws = wb.addWorksheet(`Hours ${monthFormatted}-${yearFormatted}`)
+    const ws = wb.addWorksheet(`Hours ${ymd[0]}-${ymd[1]}`)
     
     const styleTitle = wb.createStyle({font: {bold: true, color: '#000000', size: 12}})
     const styleDefault = wb.createStyle({font: {color: '#000000', size: 12}})
@@ -120,9 +105,9 @@ async function outputExcel(user, branches, date) {
     ws.cell(itemRow, 1).string('Total:').style(styleTitle)
     ws.cell(itemRow, 2).formula(`SUMIF(C2:C${itemRow -1},"x",B2:B${itemRow -1})`)
     
-    const filename = `${date.getMonth() + 1}-${date.getYear() - 100}-${user.username}.xlsx`
-    console.log(`${chalk.blue('wrote excel hours sheet:')} ${filename}`)
+    const filename = `${ymd[0]}-${ymd[1]}-${user.username}.xlsx`
     wb.write(filename)
+    console.log(`${chalk.green('excel export:')} ${filename}`)
 }
 
 yargs(hideBin(process.argv))
