@@ -1,8 +1,9 @@
 # Wakamonth
 
-Generate reports of coding time in hours per Git branch, based on Wakatime/Wakapi activity.
-Please notice that time tracked by Wakapi is an **estimate**; not legally binding,
-so please keep that in mind when using it for billing reports / invoices.
+Generate reports of working time in hours per Git branch, based on your Wakatime/Wakapi activity.
+Please notice that time tracked by these tools are an **estimate**; not legally binding,
+so make sure to always verify the output of Wakamonth manually when using it for billing
+reports / invoices.
 
 ## Getting started
 
@@ -22,15 +23,23 @@ A Wakamonth config file is not required, unless you want to change its defaults:
 
 ```json
 {
-    "backend": "wakapi",
-    "spread_unallocated": true,
-    "precision": 60,
+    "autolink": {
+        "enabled": "false",
+        "issue_regex": "^\\d+",
+        "url": "https://codeberg.org/organisation/{{project}}/issues/{{issue}}"
+    },
+    "include": {
+        "ignore_regex": "^-fix-|main|staging"
+    },
+    "precision": 30,
+    "spread_unallocated": true
 }
 ```
 
-* backend: "wakapi" or "wakatime"
+* autolink: automatically links a branch name to an issue in the export
+* include.ignore_regex: regex for branch names to exclude from the total count
 * precision: 60 (hours) | 30 (half-hourly) | 15 (quarter-hourly)
-* spread_unallocated: Unknown hours will be spread across other branches if active
+* spread_unallocated: Unallocated hours will be spread across other branches if active
 
 ```bash
 wget https://raw.githubusercontent.com/bitstillery/wakamonth/main/.wakamonthrc.example -o ~/.wakamonthrc

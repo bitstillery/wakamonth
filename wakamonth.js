@@ -85,7 +85,7 @@ async function outputExcel(user, project, branches, date) {
     
     ws.cell(1, 1).string('Branch').style(styleTitle)
     ws.cell(1, 2).string('Hours').style(styleTitle)
-    ws.cell(1, 3).string('Include').style(styleTitle)
+    ws.cell(1, 3).string('Declarable').style(styleTitle)
     ws.column(1).setWidth(60)
 
     let itemRow = 2
@@ -159,7 +159,7 @@ yargs(hideBin(process.argv))
         }
         const project = argv.project
         const branches = {}
-        let allocatedHours = 0
+        let totalHours = 0, declarableHours = 0
         const date = new Date()
         date.setMonth(argv.month - 1)
         date.setFullYear(argv.year)
@@ -175,9 +175,13 @@ yargs(hideBin(process.argv))
             process.exit(1)
         }
 
-        for (const resultSet of result.data) {   
+        let branchNameLength = 42
+        for (const resultSet of result.data) {
             // No rounding; just keep the Wakapi numbers here in minutes.
             for (const branch of resultSet.branches) {
+                if (branch.name.length > branchNameLength) {
+                    branchNameLength = branch.name.length
+                }
                 const total = branch.total_seconds / 60
                 if (!(branch.name in branches)) {
                     branches[branch.name] = {total}
@@ -192,39 +196,43 @@ yargs(hideBin(process.argv))
             return
         }
 
-        let spreadUnknown = 0
+        let spreadUnknown = 0        
 
-
-        allocatedHours
-        const optionUnallocated = {label: chalk.yellow('unallocated'), nodes: []}  
+        const optionTime = {label: chalk.green('time'), nodes: []}
         if (branches.unknown) {
             const unAllocatedHours = (Math.ceil(branches.unknown.total / config.precision) * config.precision) / 60                              
             spreadUnknown = Math.ceil(branches.unknown.total / Object.keys(branches).length)
-            optionUnallocated.nodes.push({label: `${chalk.white('total'.padEnd(48))} ${String(unAllocatedHours).padStart(5)}h`})
-            optionUnallocated.nodes.push({label: `${chalk.white('spread'.padEnd(48))} ${(config.spread_unallocated ? 'yes' : 'no').padStart(6)}`})
-            optionUnallocated.nodes.push({label: `${chalk.white('time / branch'.padEnd(48))} ${String((spreadUnknown / 60).toFixed(2)).padStart(5)}h`})
+            optionTime.nodes.push({label: `${chalk.white(`${config.spread_unallocated ? 'unknown allocated' : 'unknown unallocated'}`.padEnd(branchNameLength))} ${String(unAllocatedHours).padStart(5)}h`})
+            if (config.spread_unallocated) {
+                optionTime.nodes.push({label: `${chalk.white('unknown allocated / branch'.padEnd(branchNameLength))} ${String((spreadUnknown / 60).toFixed(2)).padStart(5)}h`})
+            }
             delete branches.unknown
         }
-       
-        for (const branch of Object.values(branches)) {
+        
+        
+        for (const [branchName, branch] of Object.entries(branches)) {
             // Rounding; assign unallocated hours (if applicable).
             if (config.spread_unallocated) { 
                 branch.total += spreadUnknown
             }
             branch.total = (Math.ceil(branch.total / config.precision) * config.precision) / 60
-            allocatedHours += branch.total
+            totalHours += branch.total
+
+            if (!branchName.match(config.include.ignore_regex)) {
+                declarableHours += branch.total
+            }
         }
 
-        const optionAllocated = {label: chalk.green('allocated'), nodes: []}
-        optionAllocated.nodes.push({label: `${chalk.white('total'.padEnd(48))} ${String(allocatedHours).padStart(5)}h`})
+        optionTime.nodes.push({label: `${chalk.white('total'.padEnd(branchNameLength))} ${String(totalHours).padStart(5)}h`})
+        optionTime.nodes.push({label: `${chalk.white('declarable'.padEnd(branchNameLength))} ${String(declarableHours).padStart(5)}h`})
         options.nodes.push({
-            label: 'branches',
+            label: `${chalk.blue('branches')}`,
             nodes: Object.entries(branches).map(([label, branch]) => {
-                return {label: `${chalk.blue(label.padEnd(50))} ${String(branch.total).padStart(5)}h`}
+                return {label: `${chalk.blue(label.padEnd(branchNameLength))} ${String(branch.total).padStart(5)}h`}
             })
         })
-        options.nodes.push(optionUnallocated) 
-        options.nodes.push(optionAllocated)
+
+        options.nodes.push(optionTime)
         archy(options).split('\r').forEach((line) => console.log(line))
 
         if (argv.export === 'xlsx') {
