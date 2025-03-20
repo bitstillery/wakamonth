@@ -4,6 +4,7 @@
         "issue_regex": "^\\d+",
         "url": "https://codeberg.org/organisation/{{project}}/issues/{{issue}}"
     },
+    "backend": "wakapi",
     "include": {
         "ignore_regex": "^-fix-|main|staging"
     },

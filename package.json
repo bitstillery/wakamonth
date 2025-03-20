@@ -1,26 +1,30 @@
 {
   "name": "@bitstillery/wakamonth",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "description": "Generate working hour reports from Wakatime/Wakapi data",
-  "main": "wakamonth.js",
+  "main": "wakamonth.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "wakamonth": "wakamonth.js"
+    "wakamonth": "wakamonth.ts"
   },
   "files": [
-    "README.md"
+    "README.md",
+    "wakamonth.ts"
   ],
-  "author": "Jeroen van Veen",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Garage44",
   "type": "module",
   "license": "MIT",
   "dependencies": {
     "archy": "^1.0.0",
-    "chalk": "^5.3.0",
     "dayjs": "^1.11.10",
     "excel4node": "^1.8.2",
     "ini": "^4.1.1",
+    "picocolors": "^1.1.1",
     "rc": "^1.2.8",
     "yargs": "^17.7.2"
   }

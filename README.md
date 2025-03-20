@@ -10,11 +10,11 @@ reports / invoices.
 A `wakatime.cfg` file is required with `api_key` and `api_url` set. Use like:
 
 ```bash
-npx @bitstillery/wakamonth -y 2024 -m 1 -p myproject report
+bunx @bitstillery/wakamonth -y 2024 -m 1 -p myproject report
 # Export to Excel sheet:
-npx @bitstillery/wakamonth -y 2024 -m 1 -p myproject report -e xlsx
+bunx @bitstillery/wakamonth -y 2024 -m 1 -p myproject report -e xlsx
 # Target specific user:
-npx @bitstillery/wakamonth -y 2024 -m 1 -p myproject -u myuser report -e xlsx
+bunx @bitstillery/wakamonth -y 2024 -m 1 -p myproject -u myuser report -e xlsx
 ```
 
 ## Config
@@ -51,6 +51,6 @@ vim ~/.wakamonthrc
 ```bash
 git clone https://github.com/bitstillery/wakamonth.git
 cd wakamonth
-pnpm i
-./wakamonth.js -y 2024 -m 1 -p myproject report -e stdout
+bun install
+bun run wakamonth.ts -y 2025 -m 1 -p myproject report -e stdout
 ```
