@@ -404,10 +404,6 @@ yargs(hideBin(process.argv))
                 delete dayResults[day].branches.unknown
             }
 
-            // Calculate total hours for the day and adjustment factor if fill-day is enabled
-            let dayTotal = 0
-            let adjustmentFactor = 1
-
             // First calculate the day total including all branches and spread unknown
             if (argv.fillDay) {
                 const branchCount = Object.keys(dayResults[day].branches).length
@@ -420,7 +416,7 @@ yargs(hideBin(process.argv))
 
                     for (const [branchName, branch] of Object.entries(dayResults[day].branches)) {
                         if (branch.total < 60) {
-                            smallTicketsCount++;
+                            smallTicketsCount++
                         } else {
                             remainingBranchesTotal += branch.total;
                         }
@@ -429,13 +425,63 @@ yargs(hideBin(process.argv))
                     // Calculate remaining minutes after allocating 1 hour to small tickets
                     let remainingMinutes = targetMinutes - (smallTicketsCount * 60);
 
-                    // Distribute time
+                    // Distribute time proportionally first
                     for (const [branchName, branch] of Object.entries(dayResults[day].branches)) {
                         if (branch.total < 60) {
                             branch.total = 60;  // Set minimum 1 hour
                         } else if (remainingBranchesTotal > 0) {
                             // Proportionally distribute remaining time to larger tickets
                             branch.total = (branch.total / remainingBranchesTotal) * remainingMinutes;
+                        }
+                    }
+                    
+                    // Round all branches to 30-minute increments
+                    const halfHourInMinutes = 30
+                    let roundedTotal = 0
+                    let largestBranch = null
+                    let largestAmount = 0
+                    
+                    for (const [branchName, branch] of Object.entries(dayResults[day].branches)) {
+                        // Find the largest branch before rounding
+                        if (branch.total > largestAmount) {
+                            largestAmount = branch.total
+                            largestBranch = branchName
+                        }
+                        
+                        // Round to nearest half hour for all except largest branch
+                        if (branchName !== largestBranch) {
+                            branch.total = Math.round(branch.total / halfHourInMinutes) * halfHourInMinutes
+                            roundedTotal += branch.total
+                        }
+                    }
+                    
+                    // Set largest branch to make total exactly 8 hours
+                    if (largestBranch) {
+                        dayResults[day].branches[largestBranch].total = targetMinutes - roundedTotal
+                        
+                        // Ensure the largest branch is also rounded to half hours if possible
+                        // Only if the adjustment doesn't throw off the total
+                        const idealRounded = Math.round(dayResults[day].branches[largestBranch].total / halfHourInMinutes) * halfHourInMinutes
+                        if (Math.abs(idealRounded - dayResults[day].branches[largestBranch].total) <= 15) {
+                            dayResults[day].branches[largestBranch].total = idealRounded
+                            
+                            // Distribute any tiny remainder to next largest if needed
+                            const remainingDiff = targetMinutes - (roundedTotal + idealRounded)
+                            if (Math.abs(remainingDiff) > 0.001) {
+                                // Find next largest branch
+                                let nextLargest = null
+                                let nextLargestAmount = 0
+                                for (const [branchName, branch] of Object.entries(dayResults[day].branches)) {
+                                    if (branchName !== largestBranch && branch.total > nextLargestAmount) {
+                                        nextLargestAmount = branch.total
+                                        nextLargest = branchName
+                                    }
+                                }
+                                
+                                if (nextLargest) {
+                                    dayResults[day].branches[nextLargest].total += remainingDiff
+                                }
+                            }
                         }
                     }
                 }
